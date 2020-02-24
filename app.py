@@ -3,6 +3,7 @@ import cv2
 from openvino.inference_engine import IECore, IENetwork
 import platform
 import math
+from tracked_cars import Tracked_Cars
 
 DEBUG = False #dummy variable
 
@@ -61,11 +62,12 @@ def draw_tracked_vehicles(frame, output, threshold, threshold_limit, width, heig
         #only if the accuracy is higher than the threshold
         if tracked[2]>threshold:
             #get the centroid of each tracked vehicle
-            cent = ((((tracked[3] + tracked[5])*width)/2).round(5), ((tracked[4] + tracked[6])*height/2).round(5))
+            cent = ((((tracked[3] + tracked[5])*width)/2.0).round(7), ((tracked[4] + tracked[6])*height/2.0).round(7))
             #print(cent)
-            
+           
             #append only the non zero coordinates
             if cent != (0.0, 0.0) :
+                
                 #if it is the 1st entry in the tracked_vehicles, just append
                 if len(tracked_vehicles)==0:
                     tracked_vehicles.append(cent)
@@ -78,16 +80,16 @@ def draw_tracked_vehicles(frame, output, threshold, threshold_limit, width, heig
                         dist = math.sqrt(x_dist**2 + y_dist**2)
                         #print(dist)
                         
-                    #append if distance of centroid is smaller that 0.5 
-                    if dist>35:
+                    #append if distance of centroid is smaller than 12 
+                    if dist>=1:
                         tracked_vehicles.append(cent)
                     else:
                         print("found stopped vehicle")
                         #we remove previous entry and only keep the last one
-                        idx = tracked_vehicles.index((coord[0], coord[1]))
-                        del tracked_vehicles[idx]
-                        tracked_vehicles.append(cent)
-                        #get the conner coordinates of each tracked vehicle
+                        #idx = tracked_vehicles.index((coord[0], coord[1]))
+                        #del tracked_vehicles[idx]
+                        #tracked_vehicles.append(cent)
+                        #get the conner coordinates of the tracked vehicle
                         x1 = int(tracked[3] * width)
                         y1 = int(tracked[4] * height)
                         x2 = int(tracked[5] * width)
@@ -95,10 +97,11 @@ def draw_tracked_vehicles(frame, output, threshold, threshold_limit, width, heig
                         #draw a bounding box based on them 
                         cv2.rectangle(frame, (x1,y1), (x2,y2), (0,255,255), 1)
                         
+                        
     return frame
         
 
-def draw_boxes(frame, output, threshold, threshold_limit, width, height, box_color):
+def draw_boxes(frame, output, threshold, threshold_limit, width, height, box_color, carId, tracked_vehicles):
     '''
     Draws the colored bounding boxes in the detected objects.
     '''
@@ -108,21 +111,85 @@ def draw_boxes(frame, output, threshold, threshold_limit, width, height, box_col
         color = (0,255,0)
     else:
         color = (0,0,255)
-
+    current_tracked_centroids = []
     #print(output.shape) #during debug to get the shape of the frame
     for fr in output[0][0]:
         if fr[2]>threshold:
-            
+            #calculate the coordinates of the bounding box of the tracked car
             x1 = int(fr[3] * width)
             y1 = int(fr[4] * height)
             x2 = int(fr[5] * width)
             y2 = int(fr[6] * height)
-            #if the accuracy is above the limit specified, then the rectangle will be yellow
+            #calculate the centroid of the tracked car
+            centroid = ((x1+x2)//2, (y1+y2)//2)
+            #append it to the 
+            current_tracked_centroids.append(centroid)
+                        
             if fr[2]>=threshold_limit:
                 cv2.rectangle(frame, (x1,y1), (x2,y2), (0,255,255), 1)
             else:
                 cv2.rectangle(frame, (x1,y1), (x2,y2), color, 1)
-    return frame
+
+
+    car_list = [] 
+    #print("len of tracked centroids: ", len(current_tracked_centroids))
+    #print("len of tracked vehicles: ", len(tracked_vehicles))
+    #print("carId: ", carId)
+    #if it is the 1st frame calculated, just append it to the list
+    if len(tracked_vehicles) == 0:
+   
+        for centroid in current_tracked_centroids:
+                
+            car = Tracked_Cars(carId=carId, centroid=centroid)
+            #append the car to the car list and icrease the index
+            car_list.append(car)
+            carId += 1
+            #print it to the frame
+            cv2.putText(frame, car.toString(), centroid, cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
+
+    else:
+
+        #check for the cars that were tracked in the last frame
+        for tracked in tracked_vehicles[-1]:
+            #placeholder to track the distances
+            cent_dist = []
+            tracked_centroid = tracked.getCentroid()
+            
+            for centroid in current_tracked_centroids:
+                
+                #calculate the dist from the current tracked cars
+                dist = math.sqrt(math.pow((centroid[0]-tracked_centroid[0]),2) + math.pow((centroid[1]-tracked_centroid[1]),2))
+                #print(dist)
+                cent_dist.append(dist)
+                
+            #if any distance was calculated
+            if(len(cent_dist)!=0):
+                #get the min distance and its index
+                min_dist = min(cent_dist)
+                min_idx = cent_dist.index(min_dist)
+                #print("centroid distances: ", cent_dist)
+                #print('min idx:', min_idx)
+
+                #set the new cetroid and add this one to the new car list
+                tracked.setCentroid(current_tracked_centroids[min_idx])
+                car_list.append(tracked)
+                #remove the car from the current list
+                current_tracked_centroids.remove(centroid)
+                tracked_vehicles[-1].remove(tracked)
+                cv2.putText(frame, tracked.toString(), centroid, cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
+
+    for leftovers in current_tracked_centroids:
+        #print("leftovers: ", leftovers)
+        car = Tracked_Cars(carId=carId, centroid=leftovers)
+        car_list.append(car)
+        carId += 1
+        cv2.putText(frame, car.toString(), car.getCentroid(), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
+
+
+    tracked_vehicles.append(car_list)   
+
+                
+    return carId, frame
 
 def perform_inference(network, exec_network, args, request_id):
     #for the given network, calculate
@@ -154,12 +221,13 @@ def perform_inference(network, exec_network, args, request_id):
     fourcc = cv2.VideoWriter_fourcc(*'MPG4')
     out = cv2.VideoWriter('out.mp4', fourcc, 30, (width,height))
     
-    # Process frames until the video ends, or process is exited
+    
     # placeholder for the coordinates of the centroid of each object tracked by the algorithm
     centr_coords = []
-    # in here we are gonna track the coordinates of the stopped vehicles
+    #placeholder for the different cars we have found
     tracked_vehicles = []
-
+    carId = 0 #placeholder for the carIds to be tracked
+    # Process frames until the video ends, or process is exited
     while cap.isOpened():
         # Read the next frame
         flag, frame = cap.read()
@@ -180,12 +248,14 @@ def perform_inference(network, exec_network, args, request_id):
                 print(out_frame)
             
             # Update the frame to include detected bounding boxes
-            #frame = draw_boxes(frame=frame, output=out_frame, threshold=float(args.t), threshold_limit=float(args.tl), width=width, height=height, box_color=args.c)
-            frame = draw_tracked_vehicles(frame=frame, output=out_frame, threshold=float(args.t), threshold_limit=float(args.tl), width=width, height=height, box_color=args.c, tracked_vehicles=tracked_vehicles)
-
+            carId, frame = draw_boxes(frame=frame, output=out_frame, threshold=float(args.t), threshold_limit=float(args.tl), width=width, height=height, box_color=args.c, carId=carId, tracked_vehicles=tracked_vehicles)
+            
+            #frame = draw_tracked_vehicles(frame=frame, output=out_frame, threshold=float(args.t), threshold_limit=float(args.tl), width=width, height=height, box_color=args.c, tracked_vehicles=tracked_vehicles)
+            #print("outside len tracked vehicles: ", len(tracked_vehicles))
+            #print("outside carid=", carId)
             #print("len of tracked vehicles", len(tracked_vehicles))
-            ##every 15 frames, check if there are stopped vehicles tracked
-            #while len(tracked_vehicles) >= 15:
+            ##if there are more than 40 cars found, remove the older ones
+            #while len(tracked_vehicles) >= 40:
             #    del tracked_vehicles[0]
 
             #print("tracked vehicles:", tracked_vehicles)
@@ -282,6 +352,8 @@ def load_model_to_IE(args):
 def main():
     args = get_args()
     request_id = 0
+
+    
     network, exec_network = load_model_to_IE(args=args)
     perform_inference(network= network, exec_network=exec_network, args=args, request_id=request_id)
  

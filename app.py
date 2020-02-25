@@ -112,7 +112,7 @@ def track_objects(frame, tracked_vehicles, current_tracked_centroids, tracked_bo
                     y2 = tracked_box_coord[i][3]
                     cv2.rectangle(frame, (x1,y1), (x2,y2), box_color, 1)
                     cv2.putText(frame, tracked.toString(), centroid, cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
-                elif (min_dist==0) and checkStopped:
+                elif (min_dist<=2) and checkStopped:
 
                     min_idx = cent_dist.index(min_dist)
                     #print("centroid distances: ", cent_dist)
@@ -176,7 +176,7 @@ def draw_boxes(frame, output, threshold, width, height, box_color, carId, tracke
             tracked_box_coord.append(box_coord)
 
     #track the objects found in the new frame, based on the previous
-    carId = track_objects(frame=frame, tracked_vehicles=tracked_vehicles, current_tracked_centroids=current_tracked_centroids, tracked_box_coord=tracked_box_coord, box_color=color, carId=carId, minDist=80, checkStopped=True)
+    carId = track_objects(frame=frame, tracked_vehicles=tracked_vehicles, current_tracked_centroids=current_tracked_centroids, tracked_box_coord=tracked_box_coord, box_color=color, carId=carId, minDist=40, checkStopped=True)
                 
     return carId, frame
 

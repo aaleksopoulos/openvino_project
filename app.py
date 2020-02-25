@@ -157,7 +157,7 @@ def draw_boxes(frame, output, threshold, width, height, box_color, carId, tracke
         color = (0,255,0)
     else:
         color = (0,255,255)
-    above_threshold_limit = False
+
     current_tracked_centroids = []
     tracked_box_coord = []
     #print(output.shape) #during debug to get the shape of the frame

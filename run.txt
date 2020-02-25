@@ -1,1 +1,1 @@
-python app.py -m "models\ssd_mobilenet.xml" -d "CPU" -i "input.mp4" -t 0.6 -tl 0.8 -c "RED"
+python app.py  -m "models\ssd_mobilenet.xml"  -d "CPU"  -i "input.mp4"  -t 0.6  -c "YELLOW"

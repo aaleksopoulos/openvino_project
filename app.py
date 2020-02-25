@@ -134,12 +134,19 @@ def track_objects(frame, tracked_vehicles, current_tracked_centroids, tracked_bo
 
 
     #add everything left as a new object
-    for leftovers in current_tracked_centroids:
+    for i in range(len(current_tracked_centroids)):
+        leftovers = current_tracked_centroids[i]
         #print("leftovers: ", leftovers)
         car = Tracked_Cars(carId=carId, centroid=leftovers)
         car_list.append(car)
         carId += 1
-        #cv2.putText(frame, car.toString(), car.getCentroid(), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
+        if not checkStopped:
+            x1 = tracked_box_coord[i][0]
+            y1 = tracked_box_coord[i][1]
+            x2 = tracked_box_coord[i][2]
+            y2 = tracked_box_coord[i][3] 
+            cv2.rectangle(frame, (x1,y1), (x2,y2), box_color, 1)
+            cv2.putText(frame, car.toString(), car.getCentroid(), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
 
 
     tracked_vehicles.append(car_list) 
@@ -176,7 +183,7 @@ def draw_boxes(frame, output, threshold, width, height, box_color, carId, tracke
             tracked_box_coord.append(box_coord)
 
     #track the objects found in the new frame, based on the previous
-    carId = track_objects(frame=frame, tracked_vehicles=tracked_vehicles, current_tracked_centroids=current_tracked_centroids, tracked_box_coord=tracked_box_coord, box_color=color, carId=carId, minDist=40, checkStopped=True)
+    carId = track_objects(frame=frame, tracked_vehicles=tracked_vehicles, current_tracked_centroids=current_tracked_centroids, tracked_box_coord=tracked_box_coord, box_color=color, carId=carId, minDist=12, checkStopped=True)
                 
     return carId, frame
 

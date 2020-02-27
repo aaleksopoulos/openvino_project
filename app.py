@@ -51,7 +51,152 @@ def preprocessing(frame, width, height):
     frame = frame.transpose((2,0,1))
     return frame.reshape(1, 3, width, height)
 
-def track_objects(frame, tracked_vehicles, current_tracked_centroids, tracked_box_coord, box_color, carId, minDist=0, checkStopped=False):
+def track_objects_iou(frame, tracked_vehicles, current_tracked_centroids, current_tracked_box_coord, box_color, carId, checkStopped=False):
+    '''
+    Tracks the car objects in the frame, returns the last carId found
+    If checkStopped is False, it will try to track objects, else it will try to track stopped objects
+    '''
+    car_list = [] 
+    if DEBUG:
+        print("len of tracked centroids: ", len(current_tracked_centroids))
+        print("len of tracked vehicles: ", len(tracked_vehicles))
+        print("carId: ", carId)
+    #if it is the 1st frame calculated, just append it to the list
+    if len(tracked_vehicles) ==0:
+   
+        for i in range(len(current_tracked_box_coord)):
+            centroid = current_tracked_centroids[i]
+            box = current_tracked_box_coord[i]
+
+            car = Tracked_Cars(carId=carId, centroid=centroid, x1=box[0], x2=box[1], y1=box[2], y2=box[3])
+            #append the car to the car list and icrease the index
+            car_list.append(car)
+            carId += 1
+            
+            #print it to the frame
+            if not checkStopped:
+                cv2.putText(frame, car.toString(), centroid, cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
+
+    else:
+
+        #check for the cars that were tracked in the last frame
+        for tracked in tracked_vehicles[-1]:
+            #placeholder to track the iou
+            ious = []
+
+            #get the coordinates and the area of each tracked object
+            trackedX1 = tracked.getX1()
+            trackedX2 = tracked.getX2()
+            trackedY1 = tracked.getY1()
+            trackedY2 = tracked.getY2()
+            trackedArea = tracked.getArea()
+            
+            for i in range(len(current_tracked_box_coord)):
+                #get the coordinates of each tracked car in current frame
+                curX1 = current_tracked_box_coord[i][0]
+                curY1 = current_tracked_box_coord[i][1]
+                curX2 = current_tracked_box_coord[i][2]
+                curY2 = current_tracked_box_coord[i][3]
+                cur_area = abs(curX1 - curX2) * abs(curY1 - curY2)
+                #calculate the iou for each, if there is an overlap
+                if (((curX1>trackedX1 and curX1<trackedX2) or (curX2>trackedX1 and curX2<trackedX2)) and ((curY1>trackedY1 and curY1<trackedY2) or (curY2>trackedY1 and curY2<trackedY2))):
+                    
+                    #iou = areaOfOverlap/areaOfUnion
+                    #get the coordinates of the intesection square
+                    #a list to hold the x and y-coordinates
+                    x = [trackedX1, trackedX2, curX1, curX2]
+                    y = [trackedY1, trackedY2, curY1, curY2]
+                    #the intersection area will be from the inbetween coordinates
+                    x.sort()
+                    y.sort()
+                    interArea = (x[2]-x[1]) * (y[2]-y[1])
+                    #xA = max(trackedX1, curX1)
+                    #xB = min(trackedX2, curX2)
+                    #yA = max(trackedY1, curY2)
+                    #yB = min(trackedY2, curY2)
+                    #interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
+
+                    iou = (interArea) / (cur_area + trackedArea-interArea)
+                    if DEBUG:
+                        print("----------------------------------------------------------------------------------------------------")
+                        print("interArea: ", interArea)
+                        print("current area: ", cur_area)
+                        print("tracked area: ", trackedArea)
+                        print("box of current area: x1: ", curX1 , ' x2: ', curX2, " y1: ", curY1, " y2: ", curY2)
+                        print("box of tracked area: x1: ", trackedX1 , ' x2: ', trackedX2, " y1: ", trackedY1, " y2: ", trackedY2)
+                        print('x coords: ', x)
+                        print('y coords: ', y)
+                        print('iou: ', iou)
+                        print("----------------------------------------------------------------------------------------------------")
+                    ious.append(iou)
+                
+            #if any iou was calculated
+            if(len(ious)!=0):
+                #get the max iou
+                max_iou = max(ious)
+                if DEBUG:
+                    print(ious)
+                    print(max_iou)
+                max_idx = ious.index(max_iou)
+              
+                #get the coordinates of the box  
+                x1 = current_tracked_box_coord[max_idx][0]
+                y1 = current_tracked_box_coord[max_idx][1]
+                x2 = current_tracked_box_coord[max_idx][2]
+                y2 = current_tracked_box_coord[max_idx][3]
+                centroid = current_tracked_centroids[max_idx]
+                if (max_iou)>=0.40 and not checkStopped:
+                    #update the coordinates fo the box
+                    tracked.setX1(x1)
+                    tracked.setX2(x2)
+                    tracked.setY1(y1)
+                    tracked.setY2(y2)
+                    tracked.setCentroid(centroid)
+                    car_list.append(tracked)
+                    #remove the car from the current list
+                    current_tracked_centroids.remove(centroid)
+                    current_tracked_box_coord.remove(current_tracked_box_coord[max_idx])
+                    tracked_vehicles[-1].remove(tracked)
+                    #put the box on the frame and the car id
+                    cv2.rectangle(frame, (curX1,curY1), (curX2,curY2), box_color, 1)
+                    cv2.putText(frame, tracked.toString(), centroid, cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
+
+                elif (max_iou)>=0.92 and checkStopped:
+                    #update the coordinates fo the box
+                    tracked.setX1(x1)
+                    tracked.setX2(x2)
+                    tracked.setY1(y1)
+                    tracked.setY2(y2)
+                    tracked.setCentroid(centroid)
+                    car_list.append(tracked)
+                    #remove the car from the current list
+                    current_tracked_centroids.remove(centroid)
+                    current_tracked_box_coord.remove(current_tracked_box_coord[max_idx])
+                    tracked_vehicles[-1].remove(tracked)
+                    #put the box on the frame
+                    cv2.rectangle(frame, (curX1,curY1), (curX2,curY2), box_color, 1)
+                    #cv2.putText(frame, tracked.toString(), centroid, cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
+
+    #add everything left as a new object
+    for i in range(len(current_tracked_box_coord)):
+        #get the box coordinates
+        centroid = current_tracked_centroids[i]
+        x1 = current_tracked_box_coord[i][0]
+        y1 = current_tracked_box_coord[i][1]
+        x2 = current_tracked_box_coord[i][2]
+        y2 = current_tracked_box_coord[i][3] 
+        car = Tracked_Cars(carId=carId, centroid=centroid, x1=x1, x2=x2, y1=y1, y2=y2)
+        car_list.append(car)
+        carId += 1
+        if not checkStopped:
+            cv2.rectangle(frame, (x1,y1), (x2,y2), box_color, 1)
+            cv2.putText(frame, car.toString(), car.getCentroid(), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
+
+
+    tracked_vehicles.append(car_list) 
+    return carId
+
+def track_objects(frame, tracked_vehicles, current_tracked_centroids, current_tracked_box_coord, box_color, carId, minDist=0, checkStopped=False):
     '''
     Tracks the car objects in the frame, returns the last carId found
     If checkStopped is False, it will try to track objects, else it will try to track stopped objects
@@ -64,14 +209,19 @@ def track_objects(frame, tracked_vehicles, current_tracked_centroids, tracked_bo
     #if it is the 1st frame calculated, just append it to the list
     if len(tracked_vehicles) ==0:
    
-        for centroid in current_tracked_centroids:
-                
-            car = Tracked_Cars(carId=carId, centroid=centroid)
+        for i in range(len(current_tracked_centroids)):
+            centroid = current_tracked_centroids[i]
+            x1 = current_tracked_box_coord[i][0]
+            y1 = current_tracked_box_coord[i][1]
+            x2 = current_tracked_box_coord[i][2]
+            y2 = current_tracked_box_coord[i][3]
+            car = Tracked_Cars(carId=carId, centroid=centroid, x1=x1, x2=x2, y1=y1, y2=y2)
             #append the car to the car list and icrease the index
             car_list.append(car)
             carId += 1
             #print it to the frame
-            #cv2.putText(frame, car.toString(), centroid, cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
+            if not checkStopped:
+                cv2.putText(frame, car.toString(), centroid, cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
 
     else:
 
@@ -106,10 +256,10 @@ def track_objects(frame, tracked_vehicles, current_tracked_centroids, tracked_bo
                     current_tracked_centroids.remove(centroid)
                     #tracked_list.remove(tracked)
                     tracked_vehicles[-1].remove(tracked)
-                    x1 = tracked_box_coord[i][0]
-                    y1 = tracked_box_coord[i][1]
-                    x2 = tracked_box_coord[i][2]
-                    y2 = tracked_box_coord[i][3]
+                    x1 = current_tracked_box_coord[i][0]
+                    y1 = current_tracked_box_coord[i][1]
+                    x2 = current_tracked_box_coord[i][2]
+                    y2 = current_tracked_box_coord[i][3]
                     cv2.rectangle(frame, (x1,y1), (x2,y2), box_color, 1)
                     cv2.putText(frame, tracked.toString(), centroid, cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
                 elif (min_dist<=2) and checkStopped:
@@ -126,10 +276,10 @@ def track_objects(frame, tracked_vehicles, current_tracked_centroids, tracked_bo
                     #tracked_list.remove(tracked)
                     tracked_vehicles[-1].remove(tracked)
                     #cv2.putText(frame, tracked.toString(), centroid, cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
-                    x1 = tracked_box_coord[i][0]
-                    y1 = tracked_box_coord[i][1]
-                    x2 = tracked_box_coord[i][2]
-                    y2 = tracked_box_coord[i][3] 
+                    x1 = current_tracked_box_coord[i][0]
+                    y1 = current_tracked_box_coord[i][1]
+                    x2 = current_tracked_box_coord[i][2]
+                    y2 = current_tracked_box_coord[i][3] 
                     cv2.rectangle(frame, (x1,y1), (x2,y2), box_color, 1)
 
 
@@ -137,22 +287,21 @@ def track_objects(frame, tracked_vehicles, current_tracked_centroids, tracked_bo
     for i in range(len(current_tracked_centroids)):
         leftovers = current_tracked_centroids[i]
         #print("leftovers: ", leftovers)
-        car = Tracked_Cars(carId=carId, centroid=leftovers)
+        x1 = current_tracked_box_coord[i][0]
+        y1 = current_tracked_box_coord[i][1]
+        x2 = current_tracked_box_coord[i][2]
+        y2 = current_tracked_box_coord[i][3]
+        car = Tracked_Cars(carId=carId, centroid=leftovers, x1=x1, x2=x2, y1=y1, y2=y2)
         car_list.append(car)
         carId += 1
         if not checkStopped:
-            x1 = tracked_box_coord[i][0]
-            y1 = tracked_box_coord[i][1]
-            x2 = tracked_box_coord[i][2]
-            y2 = tracked_box_coord[i][3] 
+ 
             cv2.rectangle(frame, (x1,y1), (x2,y2), box_color, 1)
             cv2.putText(frame, car.toString(), car.getCentroid(), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
 
 
     tracked_vehicles.append(car_list) 
     return carId
-
-       
 
 def draw_boxes(frame, output, threshold, width, height, box_color, carId, tracked_vehicles):
     '''
@@ -165,8 +314,9 @@ def draw_boxes(frame, output, threshold, width, height, box_color, carId, tracke
     else:
         color = (0,255,255)
 
+    #placeholder for the tracked centroids and boxes
     current_tracked_centroids = []
-    tracked_box_coord = []
+    current_tracked_box_coord = []
     #print(output.shape) #during debug to get the shape of the frame
     for fr in output[0][0]:
         if fr[2]>threshold:
@@ -178,13 +328,13 @@ def draw_boxes(frame, output, threshold, width, height, box_color, carId, tracke
             #calculate the centroid of the tracked car
             centroid = ((x1+x2)//2, (y1+y2)//2)
             box_coord = (x1, y1, x2 ,y2)
-            #append it to the 
+            #append it to the lists
             current_tracked_centroids.append(centroid)
-            tracked_box_coord.append(box_coord)
+            current_tracked_box_coord.append(box_coord)
 
     #track the objects found in the new frame, based on the previous
-    carId = track_objects(frame=frame, tracked_vehicles=tracked_vehicles, current_tracked_centroids=current_tracked_centroids, tracked_box_coord=tracked_box_coord, box_color=color, carId=carId, minDist=12, checkStopped=True)
-                
+    #carId = track_objects(frame=frame, tracked_vehicles=tracked_vehicles, current_tracked_centroids=current_tracked_centroids, current_tracked_box_coord=current_tracked_box_coord, box_color=color, carId=carId, minDist=12, checkStopped=False)
+    carId = track_objects_iou(frame=frame, tracked_vehicles=tracked_vehicles, current_tracked_centroids=current_tracked_centroids, current_tracked_box_coord=current_tracked_box_coord, box_color=color, carId=carId, checkStopped=True)    
     return carId, frame
 
 def perform_inference(network, exec_network, args, request_id):
@@ -196,13 +346,6 @@ def perform_inference(network, exec_network, args, request_id):
         print(input_blob)
         print(output_blob)
         print(input_shape)
-#    ### TODO: Initialize the Inference Engine
-#    ie = Network()
-#    ### TODO: Load the network model into the IE
-#    ie.load_model(model=args.m, device=args.d, cpu_extension=CPU_EXTENSION)
-#    net_input_shape = ie.get_input_shape()
-#    #print(net_input_shape)
-    #Load the modle 
     # Get and open video capture
     cap = cv2.VideoCapture(args.i)
     cap.open(args.i)
@@ -214,7 +357,7 @@ def perform_inference(network, exec_network, args, request_id):
         print(height, width)
     
     # Create a video writer for the output video
-    fourcc = cv2.VideoWriter_fourcc(*'MPG4')
+    fourcc = cv2.VideoWriter_fourcc(*'DIVX')
     out = cv2.VideoWriter('out.mp4', fourcc, 30, (width,height))
     
     
@@ -249,16 +392,10 @@ def perform_inference(network, exec_network, args, request_id):
             #print("outside len tracked vehicles: ", len(tracked_vehicles))
             #print("outside carid=", carId)
             #print("len of tracked vehicles", len(tracked_vehicles))
-            ##if there are more than 40 cars found, remove the older ones
-            #while len(tracked_vehicles) >= 40:
-            #    del tracked_vehicles[0]
-
-            #print("tracked vehicles:", tracked_vehicles)
 
             #to free up some memory, only keep the last 250 if the frames are above 500
             if (len(tracked_vehicles) >= 500):
                 tracked_vehicles = tracked_vehicles[-250:-1]
-
 
         # Write out the frame
         out.write(frame)
@@ -350,14 +487,9 @@ def load_model_to_IE(args):
 def main():
     args = get_args()
     request_id = 0
-
-    
+  
     network, exec_network = load_model_to_IE(args=args)
     perform_inference(network= network, exec_network=exec_network, args=args, request_id=request_id)
- 
-
-    #infer_on_video(args)
-
 
 if __name__ == "__main__":
     main()

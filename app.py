@@ -25,7 +25,7 @@ def get_args():
     #confidence thresholds used to draw bounding boxes
     t_desc = "The threshold for model accuracy, default 0.5"
     #color of the bounding boxes, for the lower accuracy
-    c_desc = "Define the colour of the bounding boxes. Choose from 'RED', 'GREEN', BLUE', default 'RED' "
+    c_desc = "Define the colour of the bounding boxes. Choose from 'YELLOW', 'GREEN', BLUE', default 'YELLOW' "
     
 
     # -- Add required and optional groups

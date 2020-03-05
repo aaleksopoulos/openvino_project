@@ -142,7 +142,7 @@ def track_objects_iou(frame, tracked_vehicles, current_tracked_centroids, curren
                 x2 = current_tracked_box_coord[max_idx][2]
                 y2 = current_tracked_box_coord[max_idx][3]
                 centroid = current_tracked_centroids[max_idx]
-                if (max_iou)>=0.10 and not checkStopped:
+                if (max_iou)>=0.30 and not checkStopped:
                     #update the coordinates fo the box
                     tracked.setX1(x1)
                     tracked.setX2(x2)
@@ -159,7 +159,7 @@ def track_objects_iou(frame, tracked_vehicles, current_tracked_centroids, curren
                     cv2.rectangle(frame, (curX1,curY1), (curX2,curY2), box_color, 1)
                     cv2.putText(frame, tracked.toString(), centroid, cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
                     
-                elif (max_iou)>=0.91 and checkStopped:
+                elif (max_iou)>=0.92 and checkStopped:
                     #update the coordinates fo the box
                     tracked.setX1(x1)
                     tracked.setX2(x2)
@@ -193,19 +193,23 @@ def track_objects_iou(frame, tracked_vehicles, current_tracked_centroids, curren
         if DEBUG:
             print("len of car_list before: ", len(car_list))
             print("len of tracked: ", len(tracked_vehicles))
+        
+        #add all the remaining tracked vehicles to the car_list, updating their attributes
         #for tracked in tracked_vehicles[-1]:
         for tracked in tracked_vehicles:
-
+            #track how many times it was disappeared
             if not tracked.getTracked():
                 tracked.setDisappearedFames(tracked.getDisappearedFrames() + 1)
             else:
                 tracked.setDisappearedFames(0)
+            #set tracked status to false
             tracked.setTracked(False)
+            #add only if it has not been disappeared for more than maxDisappearedFrames
             if tracked.getDisappearedFrames() <= tracked.maxDisappearedFrames:
                 car_list.append(tracked)
         if DEBUG:
             print("len of car_list after: ", len(car_list))   
-
+    #return the last carId calcualted, and the car_list to be used for the next frame
     return carId, car_list
 
 def track_objects(frame, tracked_vehicles, current_tracked_centroids, current_tracked_box_coord, box_color, carId, minDist=0, checkStopped=False):
@@ -398,14 +402,6 @@ def perform_inference(network, exec_network, args, request_id):
             
             # Update the frame to include detected bounding boxes
             carId, frame, tracked_vehicles = draw_boxes(frame=frame, output=out_frame, threshold=float(args.t), width=width, height=height, box_color=args.c, carId=carId, tracked_vehicles=tracked_vehicles)
-            
-            #print("outside len tracked vehicles: ", len(tracked_vehicles))
-            #print("outside carid=", carId)
-            #print("len of tracked vehicles", len(tracked_vehicles))
-
-            #to free up some memory, only keep the last 250 if the frames are above 500
-            if (len(tracked_vehicles) >= 500):
-                tracked_vehicles = tracked_vehicles[-250:-1]
 
         # Write out the frame
         out.write(frame)

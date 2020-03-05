@@ -371,12 +371,9 @@ def perform_inference(network, exec_network, args, request_id):
         print(height, width)
     
     # Create a video writer for the output video
-    fourcc = cv2.VideoWriter_fourcc(*'DIVX')
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter('out.mp4', fourcc, 30, (width,height))
     
-    
-    # placeholder for the coordinates of the centroid of each object tracked by the algorithm
-    centr_coords = []
     #placeholder for the different cars we have found
     tracked_vehicles = []
     carId = 0 #placeholder for the carIds to be tracked

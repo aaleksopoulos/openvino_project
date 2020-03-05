@@ -451,7 +451,7 @@ def check_unsupported_layers(ie, network_model, device_name):
         print(unsup_layers)
         print("===========================================")
     #return False if all layers are supported, True otherwise
-    if len(unsup_layers) == 1:
+    if len(unsup_layers) == 0:
         return False
     else:
         return True
@@ -481,7 +481,7 @@ def load_model_to_IE(args):
             exit(1)
     #now we are gonna recheck if there are missing layers, and exit if there are 
     missing_layers =  check_unsupported_layers(ie=iec, network_model=ien, device_name=args.d)
-    if not missing_layers:
+    if missing_layers:
         print("after adding CPU extension there are still unsupported layers, exiting")
         exit(1)
    

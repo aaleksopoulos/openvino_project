@@ -242,7 +242,8 @@ def track_objects(frame, tracked_vehicles, current_tracked_centroids, current_tr
     else:
 
         #check for the cars that were tracked in the last frame
-        for tracked in tracked_vehicles[-1]:
+        #for tracked in tracked_vehicles[-1]:
+        for tracked in tracked_vehicles:
             #placeholder to track the distances
             cent_dist = []
             tracked_centroid = tracked.getCentroid()
@@ -271,7 +272,8 @@ def track_objects(frame, tracked_vehicles, current_tracked_centroids, current_tr
                     #remove the car from the current list
                     current_tracked_centroids.remove(centroid)
                     #tracked_list.remove(tracked)
-                    tracked_vehicles[-1].remove(tracked)
+                    #tracked_vehicles[-1].remove(tracked)
+                    tracked_vehicles.remove(tracked)
                     x1 = current_tracked_box_coord[i][0]
                     y1 = current_tracked_box_coord[i][1]
                     x2 = current_tracked_box_coord[i][2]
@@ -290,7 +292,8 @@ def track_objects(frame, tracked_vehicles, current_tracked_centroids, current_tr
                     #remove the car from the current list
                     current_tracked_centroids.remove(centroid)
                     #tracked_list.remove(tracked)
-                    tracked_vehicles[-1].remove(tracked)
+                    #tracked_vehicles[-1].remove(tracked)
+                    tracked_vehicles.remove(tracked)
                     #cv2.putText(frame, tracked.toString(), centroid, cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 1)
                     x1 = current_tracked_box_coord[i][0]
                     y1 = current_tracked_box_coord[i][1]
@@ -347,7 +350,7 @@ def draw_boxes(frame, output, threshold, width, height, box_color, carId, tracke
             current_tracked_box_coord.append(box_coord)
 
     #track the objects found in the new frame, based on the previous
-    #carId, tracked_vehicles = track_objects(frame=frame, tracked_vehicles=tracked_vehicles, current_tracked_centroids=current_tracked_centroids, current_tracked_box_coord=current_tracked_box_coord, box_color=color, carId=carId, minDist=12, checkStopped=False)
+    #carId, tracked_vehicles = track_objects(frame=frame, tracked_vehicles=tracked_vehicles, current_tracked_centroids=current_tracked_centroids, current_tracked_box_coord=current_tracked_box_coord, box_color=color, carId=carId, minDist=12, checkStopped=True)
     carId, tracked_vehicles = track_objects_iou(frame=frame, tracked_vehicles=tracked_vehicles, current_tracked_centroids=current_tracked_centroids, current_tracked_box_coord=current_tracked_box_coord, box_color=color, carId=carId, checkStopped=True)    
     return carId, frame, tracked_vehicles
 

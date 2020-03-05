@@ -2,7 +2,7 @@ class Tracked_Cars():
     '''
     Keeps track of the car objects that were tracked based on their centroid
     '''
-    def __init__(self, carId, centroid, x1, x2, y1, y2, maxDisappearedFrames=40):
+    def __init__(self, carId, centroid, x1, x2, y1, y2, maxDisappearedFrames=200):
         '''
         initialize the general object to be found
         '''

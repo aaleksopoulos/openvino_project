@@ -375,7 +375,7 @@ def perform_inference(network, exec_network, args, request_id):
     
     # Create a video writer for the output video
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter('out.mp4', fourcc, 30, (width,height))
+    out = cv2.VideoWriter('out.mp4', fourcc, 25, (width,height))
     
     #placeholder for the different cars we have found
     tracked_vehicles = []

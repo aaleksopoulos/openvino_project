@@ -1,5 +1,5 @@
-# openvino_project
-A project for the Udacity Intel® Edge AI Foundation Course
+# Tracking vehicles that might cause problems to normal traffic flow
+The idea behind the project it to utilize the CCTV's that are present to current highways, as well as cities, in order to track vehicles that have stopped, for any reason. This idea could be expanded by adding several features, like tracking people that might cause issues in highways mainly, or vehicles moving in the wrong direction. This info could be utilized traffic control center or the authorities so further action could be taken.
 
 # Introduction
 
